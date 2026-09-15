@@ -1,0 +1,6 @@
+confluent-kafka>=2.8,<3
+kafka-python>=2.2,<3
+pyspark==3.5.3
+python-dotenv==1.2.2
+requests==2.32.3
+pytest>=8.3,<9

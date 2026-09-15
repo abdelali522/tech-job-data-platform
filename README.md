@@ -1,130 +1,400 @@
-# 🚀 Tech Job Trends: Real-Time ETL Pipeline
+# Tech Job Data Platform
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
-![Spark](https://img.shields.io/badge/Apache_Spark-4.1.1-orange)
-![Kafka](https://img.shields.io/badge/Apache_Kafka-3.6-black)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
-![Airflow](https://img.shields.io/badge/Apache_Airflow-2.8-lightgrey?label=Airflow%20%28planned%29)
-![Architecture](https://img.shields.io/badge/Architecture-Medallion-success)
+An end-to-end data engineering project that ingests job-market data from a REST API, streams it through Kafka, processes it with Spark Structured Streaming, stores medallion layers in AWS S3, catalogs the data with Glue/Athena, and serves curated Gold data from PostgreSQL for analytics and BI.
 
-An end-to-end, distributed data engineering pipeline designed to ingest, process, and analyze global technology job market trends in real time.
+This project is designed as a production-style portfolio pipeline for modern data engineering workflows.
 
-## 📌 Business Context & Value
-
-In a rapidly shifting job market, batch processing is no longer sufficient to track skill demand. This project eliminates data latency by implementing a streaming architecture. It continuously extracts job postings, normalizes skill requirements, and serves clean data to a warehouse, enabling real-time analytics on hiring trends.
-
-## 🏗️ Architecture Design (Medallion Approach)
-
-This pipeline strictly follows the **Medallion Data Architecture**:
-
-* **🥉 Bronze (Raw Ingestion):** Python-based extractors pull unstructured job postings via APIs/scraping and push them directly to an **Apache Kafka** topic (`tech_jobs_stream`). Data is appended exactly as it arrives.
-* **🥈 Silver (Stream Processing & Cleaning):** **PySpark (4.1.1) Structured Streaming** consumes the Kafka topic. It enforces schema validation, parses JSON payloads, handles missing values, and standardizes job titles.
-* **🥇 Gold (Serving Layer):** The transformed micro-batches are continuously upserted into a **PostgreSQL** data warehouse, making the data instantly available for downstream BI tools and advanced analytics.
-
-## 📂 Repository Structure
+## Architecture
 
 ```text
-tech-job/
-├── config/
-│   └── settings.py          # Environment variables and DB credentials
-├── drivers/
-│   └── postgresql-*.jar     # JDBC driver for Spark-to-Postgres connection
-├── ingestion/
-│   ├── scraper.py           # Raw data extraction logic
-│   ├── api_ingestion.py     # API connection handlers
-│   └── kafka_producer.py    # Kafka producer: streams fetched data to broker
-├── transformation/
-│   ├── silver_cleaning.py   # Batch cleaning and normalization scripts
-│   ├── gold_skills.py       # Aggregation logic for the Gold layer
-│   └── stream_gold.py       # PySpark Structured Streaming consumer
-├── requirements.txt         # Project dependencies
-├── .gitignore                # Excludes raw data lake storage and env files
-└── README.md
+CleanJobData API
+        |
+        v
+Airflow-orchestrated Python ingestion
+        |
+        v
+Kafka topic: jobs.raw
+        |
+        v
+Spark Structured Streaming
+        |
+        +--> AWS S3 Bronze: raw JSON
+        |
+        +--> AWS S3 Silver: typed Parquet
+        |
+        +--> PostgreSQL Gold: analytics-ready serving table
+        |
+        v
+Power BI / SQL consumers
+
+AWS S3 Silver
+        |
+        v
+AWS Glue Data Catalog
+        |
+        v
+AWS Athena SQL
 ```
 
-## ⚙️ Prerequisites
+## What This Project Demonstrates
 
-* **Python 3.12+**
-* **Java 17+** (required for Spark 4.x)
-* **Apache Kafka** & **ZooKeeper**
-* **Apache Spark 4.1.1** (built for Scala 2.13)
-* **PostgreSQL**
+- REST API ingestion with retries and pagination
+- Kafka-based event streaming
+- Spark Structured Streaming processing
+- Medallion architecture: Bronze, Silver, Gold
+- AWS S3 data lake storage
+- AWS Glue/Athena external querying over S3
+- PostgreSQL Gold serving layer with upsert logic
+- Airflow orchestration and scheduling
+- Docker Compose local infrastructure
+- Environment-based configuration
+- Basic ingestion tests with `pytest`
 
-## 🚀 Quick Start Guide
+## Tech Stack
 
-### 1. Environment Setup
+| Layer | Technology |
+|---|---|
+| Orchestration | Apache Airflow |
+| Ingestion | Python, Requests |
+| Streaming broker | Apache Kafka |
+| Stream processing | Apache Spark Structured Streaming |
+| Data lake | AWS S3 |
+| Catalog/query | AWS Glue Data Catalog, Amazon Athena |
+| Serving database | PostgreSQL |
+| BI-ready output | PostgreSQL Gold table |
+| Infrastructure | Docker Compose |
+| Testing | Pytest |
 
-Clone the repository and install dependencies:
+## Repository Structure
 
-```bash
-git clone git@github.com:abdelali522/tech-job.git
-cd tech-job
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+```text
+airflow/dags/                 Airflow DAG for scheduled ingestion
+aws/athena/                   Athena SQL templates for Glue tables and views
+config/                       Environment and API settings
+docs/                         Additional architecture and AWS setup notes
+ingestion/                    CleanJobData API ingestion and Kafka producer
+scripts/                      PowerShell helper scripts
+storage/gold/                 PostgreSQL initialization SQL
+streaming/                    Spark Structured Streaming job
+tests/                        Ingestion unit tests
+transformation/               Older local batch transformation experiment
+docker-compose.yml            Local platform services
+documentation.md              Full detailed project documentation
+requirements.txt              Python dependencies
 ```
 
-### 2. Start Infrastructure
+## Data Flow
 
-Run the following services in separate terminal sessions:
+1. Airflow runs the ingestion DAG on an hourly schedule.
+2. The Python ingestion script calls the CleanJobData API.
+3. API results are published to Kafka topic `jobs.raw`.
+4. Spark Structured Streaming reads from Kafka.
+5. Raw JSON payloads are written to the S3 Bronze layer.
+6. Parsed job records are written to the S3 Silver layer as Parquet.
+7. Curated records are upserted into PostgreSQL Gold.
+8. Glue/Athena external tables expose S3 data for SQL analytics.
 
-**Terminal 1: ZooKeeper**
+## S3 Layout
 
-```bash
-bin/zookeeper-server-start.sh config/zookeeper.properties
+By default, the Spark job writes to:
+
+```text
+s3://<bucket>/bronze/jobs/
+s3://<bucket>/silver/jobs/
+s3://<bucket>/checkpoints/jobs/
 ```
 
-**Terminal 2: Kafka Broker**
+Athena query results can be stored under:
 
-```bash
-bin/kafka-server-start.sh config/server.properties
+```text
+s3://<bucket>/athena-results/
 ```
 
-**Terminal 3: Database Preparation**
+## Prerequisites
 
-Ensure your PostgreSQL instance is running and create the target database:
+- Docker Desktop
+- Python virtual environment for local development
+- AWS account
+- S3 bucket
+- AWS access key with permissions for S3, Glue, and Athena
+- CleanJobData API key
+
+## Environment Configuration
+
+Create a `.env` file from `.env.example`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Then fill in the required values:
+
+```env
+CLEANJOBDATA_API_KEY=your_cleanjobdata_key
+CLEANJOBDATA_COUNTRIES=za
+CLEANJOBDATA_TITLE=data engineer
+CLEANJOBDATA_MAX_PAGES=5
+CLEANJOBDATA_PAGE_LIMIT=20
+
+POSTGRES_PASSWORD=your_local_password
+SPARK_MAX_OFFSETS_PER_TRIGGER=1000
+
+AIRFLOW_ADMIN_USERNAME=admin
+AIRFLOW_ADMIN_PASSWORD=admin
+AIRFLOW_ADMIN_EMAIL=admin@example.com
+AIRFLOW_WEBSERVER_SECRET_KEY=replace_with_a_secret
+
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_SESSION_TOKEN=
+AWS_DEFAULT_REGION=your_bucket_region
+S3_BUCKET=your_s3_bucket_name
+ATHENA_DATABASE=tech_job_lake
+ATHENA_QUERY_RESULTS=s3://your_s3_bucket_name/athena-results/
+```
+
+The `.env` file is ignored by Git and should never be committed.
+
+## Running The Platform
+
+Start all services:
+
+```powershell
+docker compose up -d
+```
+
+Check service status:
+
+```powershell
+docker compose ps
+```
+
+Open Airflow:
+
+```text
+http://localhost:8081
+```
+
+Default local login:
+
+```text
+username: admin
+password: admin
+```
+
+Enable or manually trigger the DAG:
+
+```text
+tech_job_ingestion
+```
+
+## Key Local URLs
+
+| Service | URL |
+|---|---|
+| Airflow UI | `http://localhost:8081` |
+| Spark UI | `http://localhost:8080` |
+| PostgreSQL | `127.0.0.1:5433` |
+| Kafka external listener | `localhost:9094` |
+
+## Verifying The Pipeline
+
+Check Spark logs:
+
+```powershell
+docker compose logs --tail=200 spark-streaming
+```
+
+Check PostgreSQL Gold row count:
+
+```powershell
+docker compose exec -T postgres psql -U tech_jobs -d tech_jobs -c "SELECT COUNT(*) FROM jobs_gold;"
+```
+
+Inspect recent Gold rows:
+
+```powershell
+docker compose exec -T postgres psql -U tech_jobs -d tech_jobs -c "SELECT id, job_title, company_name, location_name, published FROM jobs_gold ORDER BY updated_at DESC LIMIT 10;"
+```
+
+Confirm files exist in S3:
+
+```text
+bronze/jobs/
+silver/jobs/
+checkpoints/jobs/
+```
+
+## AWS Glue and Athena Setup
+
+Render Athena SQL using the bucket configured in `.env`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\render_athena_sql.ps1
+```
+
+Run these generated files in Athena, in order:
+
+```text
+build/athena/create_database.sql
+build/athena/create_external_tables.sql
+build/athena/create_views.sql
+```
+
+Example Athena query:
 
 ```sql
-CREATE DATABASE tech_jobs_db;
+SELECT company_name, job_count
+FROM tech_job_lake.jobs_by_company
+ORDER BY job_count DESC
+LIMIT 10;
 ```
 
-### 3. Execute the Streaming Pipeline
+## Running Tests
 
-**Terminal 4: Start the Data Producer**
-
-Continuously fetches job postings and publishes them to Kafka.
-
-```bash
-source venv/bin/activate
-python ingestion/kafka_producer.py
+```powershell
+$env:PYTHONPATH='.'
+.\venv\Scripts\python.exe -m pytest
 ```
 
-**Terminal 5: Start the Spark Stream-to-Postgres Consumer**
+The current tests cover:
 
-Uses `spark-submit` to inject the necessary JVM dependencies (Kafka connector and PostgreSQL JDBC driver) at runtime. The Kafka connector version below is pinned to match Spark 4.1.1 — mismatched connector/Spark versions are a common source of `NoSuchMethodError` crashes.
+- API cursor pagination
+- invalid API response shape handling
+- HTTP retry configuration
 
-```bash
-source venv/bin/activate
-spark-submit \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1 \
-  --jars drivers/postgresql-42.7.2.jar \
-  transformation/stream_gold.py
+## Main Components
+
+### Airflow
+
+Airflow schedules the ingestion workflow. The DAG is defined in:
+
+```text
+airflow/dags/tech_job_ingestion.py
 ```
 
-## 🧠 Technical Challenges Solved
+It runs:
 
-* **Scala/Spark Interoperability:** Resolved native `NoSuchMethodError` crashes by aligning the Spark Structured Streaming Kafka connector version strictly to the Scala 2.13 build required by Spark 4.1.1.
-* **Offset Management:** Implemented robust checkpointing and offset handling to ensure exactly-once processing semantics and prevent data loss during stream restarts.
-* **Stateful Fault Tolerance:** Transitioned from a fragile loop-based ingestion script to a decoupled producer/consumer model, so the pipeline survives API rate limits and connection drops.
+```text
+python ingestion/api_ingestion.py
+```
 
-## 🔮 Future Roadmap
+### Kafka
 
-* **Containerization:** Dockerize ZooKeeper, Kafka, Spark, and PostgreSQL using `docker-compose` for one-click deployments.
-* **Workflow Orchestration:** Integrate Apache Airflow DAGs to manage batch fallback and scheduling (not yet implemented — see Airflow badge above).
-* **Domain Expansion:** Adapt the ingestion schema to support analytics for specific sectors, such as demand for software engineers in the medical and healthcare technology domains.
+Kafka decouples ingestion from processing. Jobs are published to:
 
----
+```text
+jobs.raw
+```
 
-**Author:** Abdelali Marin
-*Engineering Student at INPT (Institut National des Postes et Télécommunications)*
-[LinkedIn](https://linkedin.com/in/abdelali-marin) | [GitHub](https://github.com/abdelali522)
+Malformed records are sent by Spark to:
+
+```text
+jobs.dlq
+```
+
+### Spark Structured Streaming
+
+Spark reads Kafka continuously and writes:
+
+- raw JSON to S3 Bronze
+- structured Parquet to S3 Silver
+- curated rows to PostgreSQL Gold
+
+The streaming job is:
+
+```text
+streaming/spark_streaming.py
+```
+
+### PostgreSQL
+
+PostgreSQL stores the Gold serving layer.
+
+Tables:
+
+```text
+jobs_gold
+jobs_gold_stage
+```
+
+`jobs_gold` uses `id` as the primary key and is updated through an upsert.
+
+### AWS S3
+
+S3 stores the data lake and Spark checkpoints.
+
+### Glue/Athena
+
+Glue stores table metadata and Athena queries S3 data directly with SQL.
+
+## Troubleshooting
+
+### Docker cannot connect
+
+Make sure Docker Desktop is running. If needed:
+
+```powershell
+wsl --shutdown
+```
+
+Then restart Docker Desktop.
+
+### S3 403 Forbidden
+
+The AWS key does not have enough permissions. Check S3 bucket permissions for:
+
+```text
+bronze/*
+silver/*
+checkpoints/*
+athena-results/*
+```
+
+### NoSuchBucket
+
+Check that `S3_BUCKET` exactly matches the AWS bucket name.
+
+### Region or signature errors
+
+Set `AWS_DEFAULT_REGION` to the actual bucket region.
+
+### Airflow DAG does not appear
+
+Check scheduler logs:
+
+```powershell
+docker compose logs --tail=200 airflow-scheduler
+```
+
+### PostgreSQL row count is zero
+
+Check Airflow task logs, Spark logs, S3 outputs, and PostgreSQL status in that order.
+
+## Detailed Documentation
+
+For a full step-by-step explanation of every component, see:
+
+```text
+documentation.md
+```
+
+That file explains the project in more detail, including small implementation decisions and troubleshooting notes.
+
+## Future Improvements
+
+- Partition Silver data by country and ingestion date
+- Add data quality checks for missing IDs, duplicate jobs, dates, and salaries
+- Add CI with GitHub Actions
+- Add Terraform for AWS infrastructure
+- Add Power BI dashboard screenshots
+- Add monitoring for Kafka lag, Spark failures, and Airflow runs
+- Move secrets to AWS Secrets Manager or Parameter Store
+
+## Resume Summary
+
+This project can be summarized as:
+
+```text
+Designed and containerized an end-to-end data engineering platform using Airflow, Kafka, Spark Structured Streaming, AWS S3, Glue/Athena, and PostgreSQL to ingest, process, catalog, and serve job-market data for analytics.
+```

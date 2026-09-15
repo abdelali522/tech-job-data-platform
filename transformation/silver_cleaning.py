@@ -15,7 +15,7 @@ def process_silver_layer():
     
     bronze_path = f"{linux_style_path}/*.json"
     print(f"Reading raw data from: {bronze_path}")
-    raw_df= spark.read.option("multiline","true").json(bronze_path)
+    raw_df= spark.read.json(bronze_path)
     initial_count= raw_df.count()
     print(f"Total rows before cleaning: {initial_count}")
 
@@ -25,24 +25,19 @@ def process_silver_layer():
     sql_query= """
         SELECT
             id,
-            FIRST(Title) AS job_title,
-            FIRST(company.display_name) AS location_name,
-            FIRST(created) AS created_date,
-            regexp_replace(FIRST(description),'<[^>]+>','')  AS clean_description
+            FIRST(title) AS job_title,
+            FIRST(location) AS location_name,
+            FIRST(published) AS created_date,
+            FIRST(description) AS job_description
         FROM raw_jobs
         GROUP BY id
     """
     clean_df= spark.sql(sql_query)
-    silver_path= os.path.join(project_root,"storage","silver")
-    linux_silver_path= silver_path.replace("\\","/")
-    print(f"Saving data to: {linux_silver_path}")
-    clean_df.write.mode("overwrite").parquet(linux_silver_path)
     final_count= clean_df.count()
     print(f"Total rows after SQL deduplication: {final_count}")
     print(f"We removed {initial_count - final_count} duplicate rows!")
     print("\nSample of clean data: ")
     clean_df.show(5,truncate=False)
-    print("Silver layer processing complete! Data is ready for the Gold layer.")
     spark.stop()
 if __name__== "__main__":
     process_silver_layer()

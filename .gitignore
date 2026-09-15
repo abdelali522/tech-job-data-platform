@@ -1,0 +1,45 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache and test artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime logs and generated local output
+*.log
+storage/logs/
+storage/checkpoints/
+build/
+
+# Spark local metadata/output
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Airflow local/runtime noise
+airflow/logs/
+airflow/dags/__pycache__/
+airflow/*.db
+airflow/airflow.db
+
+# Docker/local override files
+docker-compose.override.yml
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
